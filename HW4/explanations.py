@@ -10,9 +10,6 @@ import torchvision.models as models
 from PIL import Image
 import matplotlib.pyplot as plt
 
-# =========================
-# 0. Paths & setup
-# =========================
 
 IMAGENET_DIR = "./imagenet_samples"
 IMAGENET_JSON = "./imagenet_class_index.json"
@@ -47,10 +44,6 @@ with open(IMAGENET_JSON, "r") as f:
 idx2label = [class_idx[str(k)][1] for k in range(len(class_idx))]
 idx2synset = [class_idx[str(k)][0] for k in range(len(class_idx))]
 
-
-# =========================
-# 1. Utils
-# =========================
 
 def load_image(path: str) -> Tuple[torch.Tensor, Image.Image]:
     img = Image.open(path).convert("RGB")
@@ -101,10 +94,6 @@ def apply_mask(input_tensor: torch.Tensor,
     x = x * mask_3d + baseline * (1.0 - mask_3d)
     return x
 
-
-# =========================
-# 2. LIME (logit-based, local)
-# =========================
 
 def lime_explanation(
     input_tensor: torch.Tensor,
@@ -167,10 +156,6 @@ def lime_heatmap(weights: np.ndarray, segments: np.ndarray) -> np.ndarray:
     return heat
 
 
-# =========================
-# 3. SmoothGrad
-# =========================
-
 def smoothgrad(
     input_tensor: torch.Tensor,
     pred_idx: int,
@@ -192,18 +177,17 @@ def smoothgrad(
         x_noisy = (x + noise).detach().clone().requires_grad_(True)
 
         logits = model(x_noisy)
-        score = logits[0, pred_idx]  # logit
+        score = logits[0, pred_idx]  
         model.zero_grad(set_to_none=True)
         score.backward()
 
-        grad = x_noisy.grad[0]       # (3,H,W)
+        grad = x_noisy.grad[0]       
         grads.append(grad)
 
-    grads = torch.stack(grads, dim=0)    # (N,3,H,W)
-    avg_grad = grads.mean(dim=0)         # (3,H,W)
-    saliency = avg_grad.abs().sum(dim=0) # (H,W)
+    grads = torch.stack(grads, dim=0)    
+    avg_grad = grads.mean(dim=0)         
+    saliency = avg_grad.abs().sum(dim=0) 
 
-    # normalize for display
     saliency = saliency - saliency.min()
     if saliency.max() > 0:
         saliency = saliency / saliency.max()
@@ -222,11 +206,6 @@ def aggregate_saliency_over_segments(
         if np.any(mask):
             scores[k] = saliency[mask].mean()
     return scores
-
-
-# =========================
-# 4. Rank correlations
-# =========================
 
 def to_ranks(x: np.ndarray) -> np.ndarray:
     order = np.argsort(x)
@@ -265,10 +244,6 @@ def kendall_tau(a: np.ndarray, b: np.ndarray) -> float:
     return (conc - disc) / (conc + disc)
 
 
-# =========================
-# 5. Visualization (like theirs)
-# =========================
-
 def save_explanations(img_path, pil_img, lime_map, sg_map):
     """
     Figure with:
@@ -305,10 +280,6 @@ def save_explanations(img_path, pil_img, lime_map, sg_map):
     print(f"Saved explanations to {out_path}")
 
 
-# =========================
-# 6. Main
-# =========================
-
 def collect_image_paths(root: str, max_images: int = 5) -> List[str]:
     exts = {".jpg", ".jpeg", ".png", ".bmp", ".jpeg", ".JPEG"}
     paths = []
@@ -341,7 +312,7 @@ def main():
         print(f"\nImage: {img_path}")
         print(f"  Predicted: {pred_syn} ({pred_label})")
 
-        # LIME (logit-based)
+        # LIME
         lime_w = lime_explanation(
             input_tensor,
             pred_idx,
@@ -361,14 +332,12 @@ def main():
             n_samples=50,
         )
 
-        # Aggregate SmoothGrad over patches
         sg_scores = aggregate_saliency_over_segments(
             sg_map,
             SEGMENTS,
             NUM_PATCHES,
         )
 
-        # Rank correlations between per-patch importances
         rho = spearman_corr(lime_w, sg_scores)
         tau = kendall_tau(lime_w, sg_scores)
 

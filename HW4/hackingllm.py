@@ -9,24 +9,16 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from trl import GRPOConfig, GRPOTrainer
 
-# ---------------------------
-# Global config
-# ---------------------------
-
 SEED = 7
 random.seed(SEED)
 torch.manual_seed(SEED)
 
-BASE_MODEL = "gpt2-medium"           # different from your classmate's Qwen
+BASE_MODEL = "gpt2-medium"
 MAX_PROMPT_LEN = 256
 MAX_COMPLETION_LEN = 64
 MAX_STEPS = 40
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# ---------------------------
-# Dataset: trl-lib/tldr
-# ---------------------------
 
 raw = load_dataset("trl-lib/tldr", split="train[:800]")
 
@@ -51,19 +43,11 @@ def build_prompt(example):
 
 dataset = raw.map(build_prompt, remove_columns=cols)
 
-# ---------------------------
-# Tokenizer
-# ---------------------------
-
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
-tokenizer.padding_side = "left"   # important for decoder-only models
+tokenizer.padding_side = "left"
 
-
-# ---------------------------
-# Helper to normalize GRPO completions
-# ---------------------------
 
 def to_text(x) -> str:
     """
@@ -84,10 +68,6 @@ def norm_tokens(s: str):
         if len(w) > 3
     }
 
-
-# ---------------------------
-# Reward functions
-# ---------------------------
 
 def reward_aligned(prompts: List[str], completions: List[str], **_) -> List[float]:
     """
@@ -145,10 +125,6 @@ def reward_hacked(prompts: List[str], completions: List[str], **_) -> List[float
     return scores
 
 
-# ---------------------------
-# GRPO training helper
-# ---------------------------
-
 @dataclass
 class RunConfig:
     name: str
@@ -183,10 +159,6 @@ def train_grpo(run: RunConfig):
     trainer.train()
     trainer.save_model()
 
-
-# ---------------------------
-# Main: train + compare
-# ---------------------------
 
 if __name__ == "__main__":
     # 1) Train aligned model
